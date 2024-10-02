@@ -27,6 +27,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['8000-annierho7-boutiqueadov1-x37z9jbv0z4.ws.codeinstitute-ide.net']
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://8000-annierho7-boutiqueadov1-x37z9jbv0z4.ws.codeinstitute-ide.net',
+]
 
 # Application definition
 
@@ -44,6 +47,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',
     'home',
+    'products',
 ]
 
 MIDDLEWARE = [
