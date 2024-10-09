@@ -1,56 +1,52 @@
 from django.shortcuts import render, redirect, reverse, get_object_or_404
 from django.contrib import messages
 from django.db.models import Q
+from django.db.models.functions import Lower
+
 from .models import Product, Category
 
 # Create your views here.
 
 def all_products(request):
-    """ A view to show all products, including sorting and search queries """
-
     products = Product.objects.all()
     query = None
     categories = None
     sort = None
     direction = None
 
-    if request.GET:
-        if 'sort' in request.GET:
-            sortkey = request.GET['sort']
-            sort = sortkey
-            
-            # Handle sorting by name
-            if sortkey == 'name':
-                sortkey = 'name'  # Assuming sorting by name does not require lowercasing
-            
-            # Handle sorting by category name
-            elif sortkey == 'category':
-                sortkey = 'category__name'
-            
-            # Determine the sorting direction
-            if 'direction' in request.GET:
-                direction = request.GET['direction']
-                if direction == 'desc':
-                    sortkey = f'-{sortkey}'
-            products = products.order_by(sortkey)
+    # Dictionary to map sort fields
+    sort_options = {
+        'price': 'price',
+        'rating': 'rating',
+        'name': 'name',
+        'category': 'category__name'
+    }
 
-        # Filter by category
-        if 'category' in request.GET:
-            categories = request.GET['category'].split(',')
-            products = products.filter(category__name__in=categories)
-            categories = Category.objects.filter(name__in=categories)
+    # Apply sorting if sort and direction parameters exist
+    if request.GET.get('sort') and request.GET.get('direction'):
+        sort = request.GET['sort']
+        direction = request.GET['direction']
+        
+        # Check if the sort field exists in our mapping
+        if sort in sort_options:
+            sort_field = sort_options[sort]
+            if direction == 'desc':
+                sort_field = f'-{sort_field}'
+            products = products.order_by(sort_field)
 
-        # Handle search queries
-        if 'q' in request.GET:
-            query = request.GET['q']
-            if not query:
-                messages.error(request, "You didn't enter any search criteria!")
-                return redirect(reverse('products'))
-            
+    # Filter by category if provided
+    if 'category' in request.GET:
+        categories = request.GET['category'].split(',')
+        products = products.filter(category__name__in=categories)
+
+    # Search functionality
+    if 'q' in request.GET:
+        query = request.GET['q']
+        if query:
             queries = Q(name__icontains=query) | Q(description__icontains=query)
             products = products.filter(queries)
 
-    # Store the current sorting for display
+    # Construct the current sorting value
     current_sorting = f'{sort}_{direction}' if sort and direction else 'None_None'
 
     context = {
@@ -61,6 +57,8 @@ def all_products(request):
     }
 
     return render(request, 'products/products.html', context)
+
+
 
 
 def product_detail(request, product_id):
