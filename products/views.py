@@ -18,21 +18,29 @@ def all_products(request):
         if 'sort' in request.GET:
             sortkey = request.GET['sort']
             sort = sortkey
+            
+            # Handle sorting by name
             if sortkey == 'name':
-                sortkey = 'lower_name'
-                products = products.annotate(lower_name=Lower('name'))
-
+                sortkey = 'name'  # Assuming sorting by name does not require lowercasing
+            
+            # Handle sorting by category name
+            elif sortkey == 'category':
+                sortkey = 'category__name'
+            
+            # Determine the sorting direction
             if 'direction' in request.GET:
                 direction = request.GET['direction']
                 if direction == 'desc':
                     sortkey = f'-{sortkey}'
             products = products.order_by(sortkey)
-            
+
+        # Filter by category
         if 'category' in request.GET:
             categories = request.GET['category'].split(',')
             products = products.filter(category__name__in=categories)
             categories = Category.objects.filter(name__in=categories)
 
+        # Handle search queries
         if 'q' in request.GET:
             query = request.GET['q']
             if not query:
@@ -42,7 +50,8 @@ def all_products(request):
             queries = Q(name__icontains=query) | Q(description__icontains=query)
             products = products.filter(queries)
 
-    current_sorting = f'{sort}_{direction}'
+    # Store the current sorting for display
+    current_sorting = f'{sort}_{direction}' if sort and direction else 'None_None'
 
     context = {
         'products': products,
