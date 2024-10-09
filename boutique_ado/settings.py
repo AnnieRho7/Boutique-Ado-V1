@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'home',
     'products',
+    'bag',
 ]
 
 MIDDLEWARE = [
@@ -76,10 +77,14 @@ TEMPLATES = [
                 'django.template.context_processors.request', # required by allauth
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'bag.contexts.bag_contents',
             ],
         },
     },
 ]
+
+FREE_DELIVERY_THRESHOLD = 50.00  # Set your threshold
+STANDARD_DELIVERY_PERCENTAGE = 10  # Delivery percentage
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
