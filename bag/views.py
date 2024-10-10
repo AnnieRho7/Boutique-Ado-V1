@@ -1,21 +1,30 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import Product
+from decimal import Decimal
 
 def view_bag(request):
     """ A view that renders the bag contents page """
-
+    
     bag = request.session.get('bag', {})  # Retrieve the bag from the session
     bag_items = []
 
-    for product_id, quantity in bag.items():
-        product = get_object_or_404(Product, id=product_id)  # Get the product from the database
-        total = product.price * quantity  # Calculate total for the product
-        bag_items.append({
-            'product': product,  # Add the actual Product instance
-            'quantity': quantity,
-            'total': total,  # Include the total in the item dict
-        })
+    # Debugging: Print the bag contents
+    print("Bag contents:", bag)  # Check the bag contents
+
+    for product_id_str, quantity in bag.items():
+        try:
+            product_id = int(product_id_str)  # Convert string to integer
+            product = get_object_or_404(Product, id=product_id)  # Get the product from the database
+            total = product.price * quantity  # Calculate total for the product
+            bag_items.append({
+                'product': product,  # Add the actual Product instance
+                'quantity': quantity,
+                'total': total,  # Include the total in the item dict
+            })
+        except Exception as e:
+            print(f"Error fetching product with ID {product_id_str}: {str(e)}")
+            messages.error(request, f"Error fetching product with ID {product_id_str}")
 
     context = {
         'bag_items': bag_items,
