@@ -5,32 +5,31 @@ from decimal import Decimal
 
 def view_bag(request):
     """ A view that renders the bag contents page """
-    
-    bag = request.session.get('bag', {})  # Retrieve the bag from the session
+    bag = request.session.get('bag', {})
     bag_items = []
-
-    # Debugging: Print the bag contents
-    print("Bag contents:", bag)  # Check the bag contents
 
     for product_id_str, quantity in bag.items():
         try:
-            product_id = int(product_id_str)  # Convert string to integer
-            product = get_object_or_404(Product, id=product_id)  # Get the product from the database
-            total = product.price * quantity  # Calculate total for the product
+            product_id = int(product_id_str)  # Convert to int
+            product = get_object_or_404(Product, id=product_id)  # Fetch the product
+            total = product.price * quantity  # Calculate total price for this item
             bag_items.append({
-                'product': product,  # Add the actual Product instance
+                'product': product,
                 'quantity': quantity,
-                'total': total,  # Include the total in the item dict
+                'total': total,
             })
+        except ValueError:
+            print(f"Invalid product ID: {product_id_str}")  # Handle non-integer IDs
         except Exception as e:
-            print(f"Error fetching product with ID {product_id_str}: {str(e)}")
-            messages.error(request, f"Error fetching product with ID {product_id_str}")
+            print(f"Error fetching product with ID {product_id_str}: {e}")
 
     context = {
-        'bag_items': bag_items,
+        'bag_items': bag_items,  # Prepare the context with bag items
     }
 
-    return render(request, 'bag/bag.html', context)
+    return render(request, 'bag/bag.html', context) 
+
+
 
 
 def remove_from_bag(request, product_id):
@@ -50,22 +49,21 @@ def remove_from_bag(request, product_id):
 
 def add_to_bag(request, item_id):
     """Add a product to the shopping bag."""
-    quantity = int(request.POST.get('quantity'))
+    quantity = int(request.POST.get('quantity', 1))  # Default to 1 if not specified
     redirect_url = request.POST.get('redirect_url')
-    
+
     # Get the existing bag from the session or create a new one
     bag = request.session.get('bag', {})
-    
+
     # Update the bag with the item id and quantity
-    if item_id in bag:
-        bag[item_id] += quantity  # Increment existing quantity
+    item_id_str = str(item_id)  # Convert to string
+    if item_id_str in bag:
+        bag[item_id_str] += quantity  # Increment existing quantity
     else:
-        bag[item_id] = quantity  # Add new item
+        bag[item_id_str] = quantity  # Add new item
 
     # Update the session bag
     request.session['bag'] = bag
     
-    # Optional: Add a message to inform the user
     messages.success(request, f'Added {quantity} of item {item_id} to your bag!')
-
     return redirect(redirect_url)
