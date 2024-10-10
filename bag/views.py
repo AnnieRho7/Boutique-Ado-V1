@@ -1,69 +1,126 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect, reverse, HttpResponse, get_object_or_404
 from django.contrib import messages
-from .models import Product
-from decimal import Decimal
+
+from products.models import Product
+
+# Create your views here.
 
 def view_bag(request):
-    """ A view that renders the bag contents page """
-    bag = request.session.get('bag', {})
-    bag_items = []
+    """ A view that renders the bag content page """
+    bag = request.session.get('bag', {})  # Get the current session bag
+    bag_items = []  # List to hold bag items
 
-    for product_id_str, quantity in bag.items():
-        try:
-            product_id = int(product_id_str)  # Convert to int
-            product = get_object_or_404(Product, id=product_id)  # Fetch the product
-            total = product.price * quantity  # Calculate total price for this item
+    # Check if there are items in the bag
+    for item_id, item_data in bag.items():
+        product = get_object_or_404(Product, pk=item_id)  # Fetch the product
+
+        # Check if item_data has sizes
+        if isinstance(item_data, dict) and 'items_by_size' in item_data:
+            for size, quantity in item_data['items_by_size'].items():
+                bag_items.append({
+                    'product': product,
+                    'quantity': quantity,
+                    'size': size,  # Include size if applicable
+                })
+        else:
+            # Assuming item_data is the quantity when not using sizes
             bag_items.append({
                 'product': product,
-                'quantity': quantity,
-                'total': total,
+                'quantity': item_data,  # Single quantity case
             })
-        except ValueError:
-            print(f"Invalid product ID: {product_id_str}")  # Handle non-integer IDs
-        except Exception as e:
-            print(f"Error fetching product with ID {product_id_str}: {e}")
 
     context = {
-        'bag_items': bag_items,  # Prepare the context with bag items
+        'bag_items': bag_items,  # Pass the bag items to the template
     }
 
-    return render(request, 'bag/bag.html', context) 
-
-
-
-
-def remove_from_bag(request, product_id):
-    """ A view to remove an item from the bag """
-    
-    bag = request.session.get('bag', {})
-    
-    if product_id in bag:
-        del bag[product_id]
-        messages.success(request, "Item removed from your bag.")
-    else:
-        messages.error(request, "Item not found in your bag.")
-    
-    request.session['bag'] = bag  # Save updated bag to the session
-    return redirect('view_bag')  # Redirect back to the bag view
+    return render(request, 'bag/bag.html', context)  # Render the template with context
 
 
 def add_to_bag(request, item_id):
-    """Add a product to the shopping bag."""
-    quantity = int(request.POST.get('quantity', 1))  # Default to 1 if not specified
+    """ Add a quantity of the specified product to the shopping bag """
+
+    product = get_object_or_404(Product, pk=item_id)
+    quantity = int(request.POST.get('quantity'))
     redirect_url = request.POST.get('redirect_url')
-
-    # Get the existing bag from the session or create a new one
+    size = None
+    if 'product_size' in request.POST:
+        size = request.POST['product_size']
     bag = request.session.get('bag', {})
-
-    # Update the bag with the item id and quantity
-    item_id_str = str(item_id)  # Convert to string
-    if item_id_str in bag:
-        bag[item_id_str] += quantity  # Increment existing quantity
-    else:
-        bag[item_id_str] = quantity  # Add new item
-
-    # Update the session bag
-    request.session['bag'] = bag
     
-    messages.success(request, f'Added {quantity} of item {item_id} to your bag!')
+    if size:
+        if item_id in list(bag.keys()):
+            if size in bag[item_id]['items_by_size'].keys():
+                bag[item_id]['items_by_size'][size] += quantity
+                messages.success(request, f'Updated size {size.upper()} {product.name} quantity to {bag[item_id]["items_by_size"][size]}')
+            else:
+                bag[item_id]['items_by_size'][size] = quantity
+                messages.success(request, f'Added size {size.upper()} {product.name} to your bag')
+        else:
+            bag[item_id] = {'items_by_size': {size: quantity}}
+            messages.success(request, f'Added size {size.upper()} {product.name} to your bag')
+    else:
+        if item_id in list(bag.keys()):
+            bag[item_id] += quantity
+            messages.success(request, f'Updated {product.name} quantity to {bag[item_id]}')
+        else:
+            bag[item_id] = quantity
+            messages.success(request, f'Added {product.name} to your bag!')
+
+    request.session['bag'] = bag
     return redirect(redirect_url)
+
+def adjust_bag(request, item_id):
+    """ Adjust the quantity of the specified product to the specified amount """
+
+    product = get_object_or_404(Product, pk=item_id)
+    quantity = int(request.POST.get('quantity'))
+    size = None
+    if 'product_size' in request.POST:
+        size = request.POST['product_size']
+    bag = request.session.get('bag', {})
+    
+    if size:
+        if quantity > 0:
+            bag[item_id]['items_by_size'][size] = quantity
+            messages.success(request, f'Updated size {size.upper()} {product.name} quantity to {bag[item_id]["items_by_size"][size]}')
+        else:
+            del bag[item_id]['items_by_size'][size]
+            if not bag[item_id['items_by_size']]:
+              bag.pop(item_id)
+            messages.success(request, f'Removed size {size.upper()} {product.name} from your bag')
+    else:
+        if quantity > 0:
+            bag[item_id] = quantity
+            messages.success(request, f'Updated {product.name} quantity to {bag[item_id]}')
+        else:
+            bag.pop(item_id)
+
+    request.session['bag'] = bag
+    return redirect(reverse('view_bag'))
+
+def remove_from_bag(request, item_id):
+    """ Remove the item from the shopping bag """
+
+    try:
+        product = get_object_or_404(Product, pk=item_id)
+        size = None
+        if 'product_size' in request.POST:
+            size = request.POST['product_size']
+        bag = request.session.get('bag', {})
+        
+        if size:
+            del bag[item_id]['items_by_size'][size]
+            if not bag[item_id]['items_by_size']:
+                bag.pop(item_id)
+            messages.success(request, f'Removed size {size.upper()} {product.name} from your bag')
+        else:
+            bag.pop(item_id)
+            messages.success(request, f'Removed {product.name} from your bag')
+
+        request.session['bag'] = bag
+        return HttpResponse(status=200)
+
+    except Exception as e:
+        messages.error(request, f'Error removing item: {e}')
+        return HttpResponse(status=500)
+    
